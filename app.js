@@ -67,7 +67,7 @@ function renderMyTickets(){
   const mine = tickets.filter(t => t.owner_id === owner);
   
   if(mine.length === 0) {
-    myTickets.innerHTML = `<div style="text-align:center; padding:40px; color:var(--muted)">No tickets found for ${owner}</div>`;
+    myTickets.innerHTML = `<div style="text-align:center; padding:40px; color:var(--muted)">No tickets found.</div>`;
     return;
   }
 
@@ -203,7 +203,7 @@ function openDetail(id){
   
   selectedTicketId = id;
   detailTitle.textContent = `${t.ticket_id} — ${t.title}`;
-  detailMeta.innerHTML = `Category: <strong>${t.category}</strong> • Created: ${fmtDate(t.created_at)} • Owner: ${t.owner_id}`;
+  detailMeta.innerHTML = `Category: <strong>${t.category}</strong> • Created: ${fmtDate(t.created_at)}`;
   detailDesc.textContent = t.description;
   
   // Attachments
