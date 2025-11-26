@@ -1,225 +1,264 @@
-/* ---------- Dummy data (inspired by your first screenshot) ---------- */
-const TICKETS = [
-  ["TKT-001","Bos saya marah-marah mulu kerjannya","New","Low","Sarah Chen","2025-01-15T10:30:00+07:00"],
-  ["TKT-002","Teman saya malas malasan saat jam kerja","Progress","Medium","John Doe","2025-01-15T11:45:00+07:00"],
-  ["TKT-003","AC ruangan tidak dingin sama sekali","New","Low","Sarah Chen","2025-01-15T14:15:00+07:00"],
-  ["TKT-004","Gaji bulan ini belum masuk ke rekening","New","High","Anonymous","2025-01-16T09:00:00+07:00"],
-  ["TKT-005","Komputer saya sering hang dan lambat","Progress","Medium","Mike Johnson","2025-01-16T10:20:00+07:00"],
-  ["TKT-006","Toilet lantai 3 kotor dan bau","Done","Low","Jane Smith","2025-01-16T11:30:00+07:00"],
-  ["TKT-007","Atasan saya tidak pernah approve cuti","New","High","John Doe","2025-01-17T08:45:00+07:00"],
-  ["TKT-008","Minta tambahan monitor untuk kerja","Progress","Medium","Sarah Chen","2025-01-17T13:00:00+07:00"],
-  ["TKT-009","Parkiran motor selalu penuh pagi hari","New","Low","Anonymous","2025-01-17T13:00:00+07:00"],
-  ["TKT-010","Rekan kerja suka gossip dan fitnah","New","High","Anonymous","2025-01-17T15:30:00+07:00"],
-  ["TKT-011","Internet kantor lemot banget","Progress","High","Anonymous","2025-01-18T09:15:00+07:00"],
-  ["TKT-012","Meja kerja saya goyang dan patah","New","Medium","Mike Johnson","2025-01-18T10:45:00+07:00"],
-  ["TKT-013","Kantin tidak ada menu vegetarian","Done","Low","Sarah Chen","2025-01-18T14:00:00+07:00"],
-  ["TKT-014","Overtime tidak dibayar sesuai aturan","New","High","Jane Smith","2025-01-19T11:00:00+07:00"],
-  ["TKT-015","Ruang meeting selalu penuh dipesan","Progress","Medium","John Doe","2025-01-19T13:30:00+07:00"],
-  ["TKT-016","Printer rusak sudah seminggu ini","New","Low","Anonymous","2025-01-19T15:45:00+07:00"],
-  ["TKT-017","Manager baru tidak menghargai tim","New","High","Mike Johnson","2025-01-20T08:30:00+07:00"]
-];
+/* ---------- Config & State ---------- */
+const KEY = 'ev_dual_tickets_v1';
+const CHANNEL = 'ev_dual_channel';
 
-// Normalize to objects
-const seed = TICKETS.map(([id,title,status,priority,assignee,createdAt]) => ({
-  id, title, status, priority,
-  assignee: assignee === "Anonymous" ? null : { name: assignee },
-  createdAt, description: ""
-}));
+// BroadcastChannel
+let bc = ('BroadcastChannel' in window) ? new BroadcastChannel(CHANNEL) : null;
+if (bc) bc.onmessage = (m) => { if (m.data && m.data.type === 'sync') renderMyTickets(); };
+window.addEventListener('storage', (e)=> { if (e.key==='ev_dual_sync_ts') renderMyTickets(); });
 
-const state = {
-  tickets: JSON.parse(localStorage.getItem("ev_tickets") || "null") || seed,
-  filters: JSON.parse(localStorage.getItem("ev_filters") || "null") || {
-    status: "All", priority: "All", assignee: "All", search: ""
-  },
-  sort: JSON.parse(localStorage.getItem("ev_sort") || "null") || { key:"createdAt", dir:"desc" },
-  editingId: null
-};
+/* ---------- Utils ---------- */
 const $ = s => document.querySelector(s);
-const tbody = $("#tbody");
+const $$ = s => document.querySelectorAll(s);
+function uid(){ return 'TKT-' + Math.floor(Math.random()*90000+10000); }
+function now(){ return new Date().toISOString(); }
+function fmtDate(iso){ return new Date(iso).toLocaleString(); }
 
-function persist(){
-  localStorage.setItem("ev_tickets", JSON.stringify(state.tickets));
-  localStorage.setItem("ev_filters", JSON.stringify(state.filters));
-  localStorage.setItem("ev_sort", JSON.stringify(state.sort));
-}
+function loadTickets(){ try { return JSON.parse(localStorage.getItem(KEY) || '[]'); } catch(e){ return []; } }
+function saveTickets(data){ localStorage.setItem(KEY, JSON.stringify(data)); broadcast(); }
+function broadcast(){ if (bc) bc.postMessage({type:'sync'}); else localStorage.setItem('ev_dual_sync_ts', Date.now()); }
 
-/* ---------- Helpers ---------- */
-const priorityRank = p => ({High:3,Medium:2,Low:1}[p]||0);
-const statusRank   = s => ({New:1,Progress:2,Done:3}[s]||0);
-function initials(name){ return (name||"").split(/\s+/).map(s=>s[0]).join("").slice(0,2).toUpperCase(); }
-function fmtDate(iso){
-  const d=new Date(iso); const t=new Date();
-  const dt=new Date(t.getFullYear(),t.getMonth(),t.getDate());
-  const dd=new Date(d.getFullYear(),d.getMonth(),d.getDate());
-  if(+dt===+dd) return "Jan 15, 10:30 AM".replace(/.*/, "Today"); // compact “Today” like screenshot
-  const opts={month:"short", day:"2-digit", hour:"2-digit", minute:"2-digit"};
-  return d.toLocaleString(undefined,opts);
-}
+/* ---------- Elements ---------- */
+const CURRENT_USER = "member:leo";
+const searchInput = $("#searchInput");
+const btnCreate = $("#btnCreate");
+const myTickets = $("#myTickets");
 
-/* ---------- Filters & Sort ---------- */
-function buildAssigneeOptions(){
-  const set = new Set(state.tickets.map(t=>t.assignee?.name || "Anonymous"));
-  const select = $("#filterAssignee");
-  const current = state.filters.assignee;
-  select.innerHTML = `<option value="All">All Assignee</option>` +
-    [...set].sort().map(n=>`<option value="${n}">${n}</option>`).join("");
-  select.value = current;
-}
-function applyFilters(list){
-  const f=state.filters; const s=f.search.trim().toLowerCase();
-  return list.filter(t=>{
-    if(f.status!=="All" && t.status!==f.status) return false;
-    if(f.priority!=="All" && t.priority!==f.priority) return false;
-    if(f.assignee!=="All"){
-      const name = t.assignee?.name || "Anonymous";
-      if(name!==f.assignee) return false;
-    }
-    if(s){
-      const hay = [t.id,t.title,t.assignee?.name||"Anonymous"].join(" ").toLowerCase();
-      if(!hay.includes(s)) return false;
-    }
-    return true;
-  });
-}
-function applySort(list){
-  const {key,dir}=state.sort, m=dir==="asc"?1:-1;
-  return list.slice().sort((a,b)=>{
-    let va=a[key], vb=b[key];
-    if(key==="priority"){ va=priorityRank(a.priority); vb=priorityRank(b.priority); }
-    else if(key==="status"){ va=statusRank(a.status); vb=statusRank(b.status); }
-    else if(key==="createdAt"){ va=new Date(a.createdAt).getTime(); vb=new Date(b.createdAt).getTime(); }
-    return (va>vb?1:va<vb?-1:0)*m;
-  });
-}
+// Modals
+const createModal = $("#createModal");
+const detailModal = $("#detailModal");
+const createForm = $("#createForm");
+const attachmentInput = $("#attachmentInput");
+const attachmentPreview = $("#attachmentPreview");
+
+// Detail Elements
+const detailTitle = $("#detailTitle");
+const detailMeta = $("#detailMeta");
+const detailDesc = $("#detailDesc");
+const detailAttachments = $("#detailAttachments");
+const commentsList = $("#commentsList");
+const commentForm = $("#commentForm");
+const commentInput = $("#commentInput");
+const detailBlocked = $("#detailBlocked");
+
+let tickets = loadTickets();
+let selectedTicketId = null;
 
 /* ---------- Render ---------- */
-function render(){
-  persist();
-  buildAssigneeOptions();
+function statusBadge(s){
+  let cls = "pill ";
+  if (s==='New') cls += "new";
+  else if (s==='In Progress' || s==='Progress') cls += "progress";
+  else if (s==='Resolved' || s==='Closed' || s==='Done') cls += "done";
+  else cls += "ghost"; // fallback
+  
+  // Map status text if needed
+  const text = s === 'Progress' ? 'In Progress' : s;
+  return `<span class="${cls}">${text}</span>`;
+}
 
-  const filtered = applyFilters(state.tickets);
-  const sorted   = applySort(filtered);
+function renderMyTickets(){
+  tickets = loadTickets();
+  myTickets.innerHTML = '';
+  const owner = CURRENT_USER;
+  const q = (searchInput.value || '').toLowerCase();
+  
+  // Filter: Owner matches AND (Search matches Title or ID)
+  const mine = tickets.filter(t => t.owner_id === owner);
+  
+  if(mine.length === 0) {
+    myTickets.innerHTML = `<div style="text-align:center; padding:40px; color:var(--muted)">No tickets found for ${owner}</div>`;
+    return;
+  }
 
-  $("#showing").textContent = `Showing ${filtered.length} tickets`;
-
-  tbody.innerHTML = sorted.map(t=>{
-    const stClass = t.status==="New" ? "new" : t.status==="Progress" ? "progress" : "done";
-    const prClass = t.priority.toLowerCase();
-    return `
-      <tr>
-        <td>${t.id}</td>
-        <td>${t.title}</td>
-        <td><span class="pill ${stClass}">${t.status}</span></td>
-        <td><span class="pill ${prClass}">${t.priority}</span></td>
-        <td>
-          ${t.assignee
-            ? `<div class="assignee"><span class="dot">${initials(t.assignee.name)}</span>${t.assignee.name}</div>`
-            : "Anonymous"}
-        </td>
-        <td>${fmtDate(t.createdAt)}</td>
-        <td>
-          <div class="action-row">
-            <button class="follow" data-act="follow" data-id="${t.id}">Follow Up</button>
-            <button class="delete" title="Delete" data-act="delete" data-id="${t.id}">🗑</button>
-          </div>
-        </td>
-      </tr>
+  mine.forEach(t => {
+    if (q && !(t.title.toLowerCase().includes(q) || t.ticket_id.toLowerCase().includes(q))) return;
+    
+    const card = document.createElement('div');
+    card.className = 'ticket-card';
+    card.innerHTML = `
+      <div class="ticket-main">
+        <div class="ticket-header">
+          <span>${t.ticket_id}</span>
+          <span>${t.title}</span>
+          ${t.anonymous ? '<span class="pill" style="background:#eee; color:#666; font-size:10px;">Anon</span>' : ''}
+        </div>
+        <div class="ticket-meta">
+          ${t.category} • ${t.priority} • ${fmtDate(t.created_at)}
+        </div>
+        <div class="ticket-desc">${t.description}</div>
+      </div>
+      <div class="ticket-side">
+        ${statusBadge(t.status)}
+        <button class="btn ghost" style="height:32px; font-size:12px; padding:0 10px;" data-id="${t.ticket_id}">Open</button>
+      </div>
     `;
-  }).join("");
-
-  // Update sort chevrons
-  document.querySelectorAll(".th-sort").forEach(b=>{
-    b.classList.remove("asc","desc");
-    if(b.dataset.sort===state.sort.key) b.classList.add(state.sort.dir);
+    
+    // Add click event to the Open button
+    const btn = card.querySelector('button');
+    btn.addEventListener('click', () => openDetail(t.ticket_id));
+    
+    myTickets.appendChild(card);
   });
 }
-render();
 
-/* ---------- Events: toolbar ---------- */
-$("#searchBox").addEventListener("input", e=>{ state.filters.search=e.target.value; render(); });
-$("#filterStatus").addEventListener("change", e=>{ state.filters.status=e.target.value; render(); });
-$("#filterPriority").addEventListener("change", e=>{ state.filters.priority=e.target.value; render(); });
-$("#filterAssignee").addEventListener("change", e=>{ state.filters.assignee=e.target.value; render(); });
+/* ---------- Actions ---------- */
+function openModal(el){ el.classList.add("show"); }
+function closeModal(el){ el.classList.remove("show"); }
 
-document.querySelectorAll(".th-sort").forEach(btn=>{
-  btn.addEventListener("click", ()=>{
-    const key=btn.dataset.sort;
-    if(state.sort.key===key){
-      state.sort.dir = state.sort.dir==="asc" ? "desc" : "asc";
-    }else{
-      state.sort.key=key;
-      state.sort.dir = (key==="createdAt") ? "desc" : "asc";
-    }
-    render();
+// Close buttons
+$$(".close-modal").forEach(btn => {
+  btn.addEventListener("click", (e) => {
+    e.preventDefault(); // prevent form submit if inside form
+    const targetId = btn.dataset.target;
+    closeModal($("#"+targetId));
   });
 });
 
-/* ---------- Row actions ---------- */
-tbody.addEventListener("click", e=>{
-  const btn=e.target.closest("button"); if(!btn) return;
-  const id=btn.dataset.id;
-  if(btn.dataset.act==="delete"){
-    if(confirm("Delete this ticket?")){
-      state.tickets = state.tickets.filter(t=>t.id!==id);
-      render();
-    }
-  }else if(btn.dataset.act==="follow"){
-    alert("Follow up recorded for "+id);
-  }
+// Create Ticket
+btnCreate.addEventListener("click", () => {
+  createForm.reset();
+  attachmentPreview.innerHTML = "";
+  openModal(createModal);
 });
 
-/* ---------- Modal (Add / Edit for future) ---------- */
-const modal = $("#modal");
-function openModal(editId=null){
-  state.editingId = editId;
-  $("#dlgTitle").textContent = editId ? "Edit Ticket" : "Add Ticket";
-  $("#saveTicket").textContent = editId ? "Save" : "Create";
-  if(editId){
-    const t=state.tickets.find(x=>x.id===editId);
-    $("#fTitle").value=t.title;
-    $("#fStatus").value=t.status;
-    $("#fPriority").value=t.priority;
-    $("#fAssignee").value=t.assignee?.name||"";
-    $("#fDesc").value=t.description||"";
-  }else{
-    $("#fTitle").value="";
-    $("#fStatus").value="New";
-    $("#fPriority").value="Low";
-    $("#fAssignee").value="";
-    $("#fDesc").value="";
-  }
-  modal.classList.add("show");
-  $("#fTitle").focus();
-}
-function closeModal(){ modal.classList.remove("show"); state.editingId=null; }
-
-$("#addTicketBtn").addEventListener("click", ()=>openModal());
-$("#closeModal").addEventListener("click", closeModal);
-$("#cancelModal").addEventListener("click", closeModal);
-modal.addEventListener("click", e=>{ if(e.target===modal) closeModal(); });
-document.addEventListener("keydown", e=>{ if(e.key==="Escape") closeModal(); });
-
-$("#saveTicket").addEventListener("click", ()=>{
-  const title=$("#fTitle").value.trim();
-  if(!title) return alert("Title is required.");
-  const payload={
-    title,
-    status: $("#fStatus").value,
-    priority: $("#fPriority").value,
-    assignee: $("#fAssignee").value.trim() ? {name: $("#fAssignee").value.trim()} : null,
-    description: $("#fDesc").value.trim()
+// Attachment Preview
+attachmentInput.addEventListener("change", () => {
+  attachmentPreview.innerHTML = "";
+  const f = attachmentInput.files[0];
+  if (!f) return;
+  const r = new FileReader();
+  r.onload = (e) => {
+    if (f.type.startsWith('image/')) {
+      const img = document.createElement('img');
+      img.src = e.target.result;
+      img.className = 'attachment-thumb';
+      attachmentPreview.appendChild(img);
+    } else {
+      const p = document.createElement('div');
+      p.style.fontSize = "12px";
+      p.textContent = f.name;
+      attachmentPreview.appendChild(p);
+    }
   };
-
-  if(state.editingId){
-    const i=state.tickets.findIndex(t=>t.id===state.editingId);
-    state.tickets[i] = { ...state.tickets[i], ...payload };
-  }else{
-    const next = Math.max(...state.tickets.map(t=>parseInt(t.id.split("-")[1],10))) + 1;
-    state.tickets.unshift({
-      id: "TKT-"+String(next).padStart(3,"0"),
-      createdAt: new Date().toISOString(),
-      ...payload
-    });
-  }
-  closeModal(); render();
+  r.readAsDataURL(f);
 });
+
+// Submit Create
+$("#submitTicket").addEventListener("click", (e) => {
+  e.preventDefault();
+  // Manual validation
+  const title = createForm.title.value.trim();
+  const desc = createForm.description.value.trim();
+  if(!title || !desc) return alert("Please fill in Title and Description");
+
+  const fd = new FormData(createForm);
+  const f = attachmentInput.files[0];
+  const attachments = [];
+  
+  if (f) {
+    const r = new FileReader();
+    r.onload = (ev)=> { 
+      attachments.push({name:f.name, data:ev.target.result}); 
+      finalizeCreate(fd, attachments); 
+    };
+    r.readAsDataURL(f);
+  } else {
+    finalizeCreate(fd, attachments);
+  }
+});
+
+function finalizeCreate(fd, attachments){
+  const owner = CURRENT_USER;
+  const t = {
+    ticket_id: uid(),
+    title: fd.get('title'),
+    description: fd.get('description'),
+    category: fd.get('category'),
+    priority: fd.get('priority') || 'Medium',
+    status: 'New',
+    assignee: 'Unassigned',
+    created_at: now(),
+    updated_at: now(),
+    anonymous: fd.get('anonymous') === 'on', // Checkbox
+    attachments,
+    comments: [],
+    owner_id: owner,
+    blocked_reason: null,
+    internal_notes: ''
+  };
+  
+  tickets = loadTickets();
+  tickets.unshift(t);
+  saveTickets(tickets);
+  closeModal(createModal);
+  renderMyTickets();
+}
+
+// Open Detail
+function openDetail(id){
+  tickets = loadTickets();
+  const t = tickets.find(x => x.ticket_id === id);
+  if (!t) return alert('Ticket not found');
+  
+  selectedTicketId = id;
+  detailTitle.textContent = `${t.ticket_id} — ${t.title}`;
+  detailMeta.innerHTML = `Category: <strong>${t.category}</strong> • Created: ${fmtDate(t.created_at)} • Owner: ${t.owner_id}`;
+  detailDesc.textContent = t.description;
+  
+  // Attachments
+  detailAttachments.innerHTML = '';
+  t.attachments.forEach(a => {
+    if (a.data && a.data.startsWith('data:image')) {
+      const img = document.createElement('img'); 
+      img.src = a.data; 
+      img.className='attachment-thumb'; 
+      detailAttachments.appendChild(img);
+    } else {
+      const ael = document.createElement('a'); 
+      ael.href = a.data; 
+      ael.target='_blank'; 
+      ael.textContent = a.name;
+      ael.style.fontSize = "13px";
+      detailAttachments.appendChild(ael);
+    }
+  });
+  
+  // Comments
+  commentsList.innerHTML = '';
+  t.comments.forEach(c => {
+    const li = document.createElement('li'); 
+    li.className='comment-item';
+    li.innerHTML = `<div class="comment-meta">${c.author} • ${fmtDate(c.created_at)}</div><div class="comment-text">${c.text}</div>`;
+    commentsList.appendChild(li);
+  });
+  
+  detailBlocked.textContent = t.blocked_reason || '-';
+  openModal(detailModal);
+}
+
+// Submit Comment
+commentForm.addEventListener('submit', e => {
+  e.preventDefault();
+  const text = commentInput.value.trim();
+  if (!text) return;
+  
+  tickets = loadTickets();
+  const t = tickets.find(x => x.ticket_id === selectedTicketId);
+  if (!t) return;
+  
+  const author = t.anonymous ? 'Anonymous' : CURRENT_USER;
+  t.comments.push({ author, text, created_at: now() });
+  t.updated_at = now();
+  saveTickets(tickets);
+  
+  commentInput.value = '';
+  openDetail(selectedTicketId); // Refresh detail view
+  renderMyTickets(); // Refresh list (if needed)
+});
+
+/* ---------- Events ---------- */
+searchInput.addEventListener('input', renderMyTickets);
+
+// Initial Render
+renderMyTickets();

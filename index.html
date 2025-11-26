@@ -45,103 +45,99 @@
         <div class="toolbar">
           <div class="search">
             <span class="icon">🔎</span>
-            <input id="searchBox" type="search" placeholder="Search by Ticket ID, Title, or Assignee..." />
-          </div>
-          <div class="filters">
-            <label class="select">
-              <select id="filterStatus">
-                <option value="All">All Status</option>
-                <option>New</option>
-                <option>Progress</option>
-                <option>Done</option>
-              </select>
-            </label>
-            <label class="select">
-              <select id="filterPriority">
-                <option value="All">All Priority</option>
-                <option>Low</option>
-                <option>Medium</option>
-                <option>High</option>
-              </select>
-            </label>
-            <label class="select">
-              <select id="filterAssignee">
-                <option value="All">All Assignee</option>
-              </select>
-            </label>
+            <input id="searchInput" type="search" placeholder="Search my tickets..." />
           </div>
           <div class="toolbar-spacer"></div>
-          <button id="addTicketBtn" class="btn primary">+ Add Ticket</button>
+          <button id="btnCreate" class="btn primary">+ Create Ticket</button>
         </div>
 
-        <!-- Table -->
-        <div class="card">
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th style="width:110px;">ID</th>
-                  <th>Title</th>
-                  <th style="width:110px;">
-                    <button class="th-sort" data-sort="status">Status<span class="carat"></span></button>
-                  </th>
-                  <th style="width:110px;">
-                    <button class="th-sort" data-sort="priority">Priority<span class="carat"></span></button>
-                  </th>
-                  <th style="width:200px;">Assignee</th>
-                  <th style="width:160px;">
-                    <button class="th-sort" data-sort="createdAt">Date Created<span class="carat"></span></button>
-                  </th>
-                  <th style="width:160px;">Action</th>
-                </tr>
-              </thead>
-              <tbody id="tbody"></tbody>
-            </table>
-          </div>
-          <div class="table-footer">
-            <div id="showing">Showing 0 tickets</div>
-          </div>
+        <!-- Ticket List -->
+        <div id="myTickets" class="ticket-list">
+          <!-- Populated by JS -->
         </div>
       </section>
     </main>
   </div>
 
-  <!-- Modal -->
-  <div class="modal" id="modal">
-    <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="dlgTitle">
+  <!-- Create Modal -->
+  <div class="modal" id="createModal">
+    <div class="dialog" role="dialog" aria-modal="true">
       <header class="dialog-head">
-        <div id="dlgTitle">Add Ticket</div>
-        <button class="icon-btn" id="closeModal">✕</button>
+        <div>Create Ticket</div>
+        <button class="icon-btn close-modal" data-target="createModal">✕</button>
       </header>
-      <div class="dialog-body">
+      <form id="createForm" class="dialog-body">
         <label class="field">
           <span>Title</span>
-          <input id="fTitle" placeholder="Describe the issue briefly" />
+          <input required name="title" placeholder="Issue title" />
         </label>
         <label class="field">
-          <span>Status</span>
-          <select id="fStatus">
-            <option>New</option><option>Progress</option><option>Done</option>
+          <span>Category</span>
+          <select required name="category">
+            <option>Fasilitas</option>
+            <option>Payroll / Benefit</option>
+            <option>Conflict / Interpersonal</option>
+            <option>Safety / K3</option>
+            <option>HR / Admin</option>
           </select>
+        </label>
+        <label class="field span-2">
+          <span>Description</span>
+          <textarea required name="description" rows="4" placeholder="Describe the issue..."></textarea>
+        </label>
+        <label class="field" style="flex-direction:row; align-items:center; gap:8px;">
+          <input type="checkbox" name="anonymous" style="width:auto; margin:0;">
+          <span>Submit Anonymously</span>
         </label>
         <label class="field">
           <span>Priority</span>
-          <select id="fPriority">
-            <option>Low</option><option>Medium</option><option>High</option>
+          <select name="priority">
+            <option>Low</option>
+            <option selected>Medium</option>
+            <option>High</option>
           </select>
         </label>
-        <label class="field">
-          <span>Assignee</span>
-          <input id="fAssignee" placeholder="e.g., Sarah Chen (or leave blank)" />
-        </label>
         <label class="field span-2">
-          <span>Description (optional)</span>
-          <textarea id="fDesc" rows="4" placeholder="Add additional context"></textarea>
+          <span>Attachment (optional)</span>
+          <input type="file" id="attachmentInput" accept=".png,.jpg,.jpeg,.pdf" />
+          <div id="attachmentPreview" style="margin-top:8px; display:flex; gap:8px;"></div>
         </label>
+      </form>
+      <footer class="dialog-foot">
+        <button class="btn ghost close-modal" data-target="createModal">Cancel</button>
+        <button class="btn primary" id="submitTicket">Submit</button>
+      </footer>
+    </div>
+  </div>
+
+  <!-- Detail Modal -->
+  <div class="modal" id="detailModal">
+    <div class="dialog" role="dialog" aria-modal="true">
+      <header class="dialog-head">
+        <div id="detailTitle">Ticket</div>
+        <button class="icon-btn close-modal" data-target="detailModal">✕</button>
+      </header>
+      <div class="dialog-body" style="display:block;">
+        <div id="detailMeta" style="font-size:13px; color:var(--muted); margin-bottom:12px;"></div>
+        <p id="detailDesc" style="margin-bottom:16px; line-height:1.5;"></p>
+        <div id="detailAttachments" style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px;"></div>
+        
+        <hr style="border:0; border-top:1px solid var(--line); margin:16px 0;">
+        
+        <h4 style="font-size:14px; margin-bottom:12px;">Comments</h4>
+        <ul id="commentsList" style="list-style:none; padding:0; margin:0 0 16px 0; display:flex; flex-direction:column; gap:12px;"></ul>
+        
+        <form id="commentForm" style="display:flex; gap:8px;">
+          <input id="commentInput" placeholder="Add comment..." style="flex:1; border:1px solid var(--line); border-radius:10px; padding:8px 12px;">
+          <button class="btn primary">Send</button>
+        </form>
+        
+        <div style="margin-top:16px; font-size:12px; color:var(--muted);">
+          Blocked / Pending Reason: <span id="detailBlocked">-</span>
+        </div>
       </div>
       <footer class="dialog-foot">
-        <button class="btn ghost" id="cancelModal">Cancel</button>
-        <button class="btn primary" id="saveTicket">Save</button>
+        <button class="btn ghost close-modal" data-target="detailModal">Close</button>
       </footer>
     </div>
   </div>
