@@ -40,6 +40,7 @@ const commentsList = $("#commentsList");
 const commentForm = $("#commentForm");
 const commentInput = $("#commentInput");
 const detailBlocked = $("#detailBlocked");
+const btnDeleteTicket = $("#btnDeleteTicket");
 
 let tickets = loadTickets();
 let selectedTicketId = null;
@@ -255,6 +256,18 @@ commentForm.addEventListener('submit', e => {
   commentInput.value = '';
   openDetail(selectedTicketId); // Refresh detail view
   renderMyTickets(); // Refresh list (if needed)
+});
+
+// Delete Ticket
+btnDeleteTicket.addEventListener("click", () => {
+  if(!selectedTicketId) return;
+  if(confirm("Are you sure you want to delete this ticket? This action cannot be undone.")){
+    tickets = loadTickets();
+    tickets = tickets.filter(t => t.ticket_id !== selectedTicketId);
+    saveTickets(tickets);
+    closeModal(detailModal);
+    renderMyTickets();
+  }
 });
 
 /* ---------- Events ---------- */
