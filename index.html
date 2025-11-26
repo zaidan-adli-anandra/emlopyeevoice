@@ -11,9 +11,12 @@
     <!-- Sidebar -->
     <aside class="sidebar">
       <div class="user">
-        <div class="avatar">DK</div>
+        <div class="avatar" id="userAvatar">DK</div>
         <div class="user-meta">
-          <div class="user-name">Dzikra Ksatria</div>
+          <select id="userSelect" style="border:0; background:transparent; font-weight:700; font-size:14px; color:var(--text); cursor:pointer; outline:none; padding:0; font-family:inherit;">
+            <option value="member:leo">Dzikra Ksatria</option>
+            <option value="admin">Admin</option>
+          </select>
         </div>
       </div>
       <nav class="sidenav">
@@ -41,8 +44,8 @@
       </header>
 
       <section class="content">
-        <!-- Toolbar -->
-        <div class="toolbar">
+        <!-- User Toolbar -->
+        <div class="toolbar" id="userToolbar">
           <div class="search">
             <span class="icon">🔎</span>
             <input id="searchInput" type="search" placeholder="Search my tickets..." />
@@ -51,9 +54,49 @@
           <button id="btnCreate" class="btn primary">+ Create Ticket</button>
         </div>
 
-        <!-- Ticket List -->
+        <!-- Admin Toolbar -->
+        <div class="toolbar" id="adminToolbar" style="display:none;">
+          <div class="search">
+            <span class="icon">🔎</span>
+            <input id="adminSearchInput" type="search" placeholder="Search tickets by id/title/owner..." />
+          </div>
+          <label class="select">
+            <select id="adminFilterSelect">
+              <option value="all">All Status</option>
+              <option value="new">New</option>
+              <option value="pending">Pending</option>
+              <option value="overdue">Overdue</option>
+            </select>
+          </label>
+          <div class="toolbar-spacer"></div>
+          <button id="btnRefresh" class="btn ghost">Refresh</button>
+        </div>
+
+        <!-- User Ticket List -->
         <div id="myTickets" class="ticket-list">
           <!-- Populated by JS -->
+        </div>
+
+        <!-- Admin Ticket Table -->
+        <div id="adminTickets" class="card" style="display:none;">
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Title</th>
+                  <th>Category</th>
+                  <th>Status</th>
+                  <th>Priority</th>
+                  <th>Assignee</th>
+                  <th>Owner</th>
+                  <th>Age</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="adminTbody"></tbody>
+            </table>
+          </div>
         </div>
       </section>
     </main>
@@ -134,6 +177,31 @@
         
         <div style="margin-top:16px; font-size:12px; color:var(--muted);">
           Blocked / Pending Reason: <span id="detailBlocked">-</span>
+        </div>
+
+        <!-- Admin Controls -->
+        <div id="adminControls" style="display:none; border-top:1px solid var(--line); padding-top:16px; margin-top:16px; grid-column: 1/-1; display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
+          <label class="field">
+            <span>Status</span>
+            <select id="adminStatusSelect">
+              <option>New</option>
+              <option>In Progress</option>
+              <option>Pending</option>
+              <option>Resolved</option>
+              <option>Closed</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Assignee</span>
+            <input id="adminAssigneeInput" placeholder="Name" />
+          </label>
+          <label class="field span-2">
+            <span>Blocked / Pending Reason</span>
+            <input id="adminBlockedInput" />
+          </label>
+          <div class="span-2" style="display:flex; justify-content:flex-end;">
+            <button id="btnAdminSave" class="btn primary">Save Changes</button>
+          </div>
         </div>
       </div>
       <footer class="dialog-foot" style="justify-content: space-between;">

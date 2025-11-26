@@ -19,10 +19,23 @@ function saveTickets(data){ localStorage.setItem(KEY, JSON.stringify(data)); bro
 function broadcast(){ if (bc) bc.postMessage({type:'sync'}); else localStorage.setItem('ev_dual_sync_ts', Date.now()); }
 
 /* ---------- Elements ---------- */
-const CURRENT_USER = "member:leo";
+const userSelect = $("#userSelect");
+const userAvatar = $("#userAvatar");
+let CURRENT_USER = "Dzikra Ksatria"; // default user
+
+// User Views
+const userToolbar = $("#userToolbar");
 const searchInput = $("#searchInput");
 const btnCreate = $("#btnCreate");
 const myTickets = $("#myTickets");
+
+// Admin Views
+const adminToolbar = $("#adminToolbar");
+const adminSearchInput = $("#adminSearchInput");
+const adminFilterSelect = $("#adminFilterSelect");
+const btnRefresh = $("#btnRefresh");
+const adminTickets = $("#adminTickets");
+const adminTbody = $("#adminTbody");
 
 // Modals
 const createModal = $("#createModal");
@@ -42,6 +55,13 @@ const commentInput = $("#commentInput");
 const detailBlocked = $("#detailBlocked");
 const btnDeleteTicket = $("#btnDeleteTicket");
 
+// Admin Detail Controls
+const adminControls = $("#adminControls");
+const adminStatusSelect = $("#adminStatusSelect");
+const adminAssigneeInput = $("#adminAssigneeInput");
+const adminBlockedInput = $("#adminBlockedInput");
+const btnAdminSave = $("#btnAdminSave");
+
 let tickets = loadTickets();
 let selectedTicketId = null;
 
@@ -56,6 +76,26 @@ function statusBadge(s){
   // Map status text if needed
   const text = s === 'Progress' ? 'In Progress' : s;
   return `<span class="${cls}">${text}</span>`;
+}
+
+function days(iso){ return Math.floor((Date.now() - new Date(iso))/ (1000*60*60*24)); }
+
+function renderApp() {
+  if (CURRENT_USER === "admin") {
+    // Show Admin View
+    userToolbar.style.display = "none";
+    myTickets.style.display = "none";
+    adminToolbar.style.display = "flex";
+    adminTickets.style.display = "block";
+    renderAdminTable();
+  } else {
+    // Show User View
+    userToolbar.style.display = "flex";
+    myTickets.style.display = "flex";
+    adminToolbar.style.display = "none";
+    adminTickets.style.display = "none";
+    renderMyTickets();
+  }
 }
 
 function renderMyTickets(){
@@ -101,6 +141,42 @@ function renderMyTickets(){
     
     myTickets.appendChild(card);
   });
+}
+
+function renderAdminTable() {
+  tickets = loadTickets();
+  const q = (adminSearchInput.value || '').toLowerCase();
+  const filter = adminFilterSelect.value;
+  
+  const filtered = tickets.filter(t => {
+    if (filter === 'new' && t.status !== 'New') return false;
+    if (filter === 'pending' && t.status !== 'Pending') return false;
+    if (filter === 'overdue') {
+      const sla = t.priority === 'High' ? 3 : (t.priority === 'Medium' ? 5 : 7);
+      if (days(t.created_at) <= sla) return false;
+    }
+    if (q && !(t.title.toLowerCase().includes(q) || t.ticket_id.toLowerCase().includes(q) || t.owner_id.toLowerCase().includes(q))) return false;
+    return true;
+  });
+
+  adminTbody.innerHTML = filtered.map(t => `
+    <tr>
+      <td>${t.ticket_id}</td>
+      <td>
+        <div style="font-weight:700">${t.title}</div>
+        <div style="font-size:12px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:200px;">${t.description}</div>
+      </td>
+      <td>${t.category}</td>
+      <td>${statusBadge(t.status)}</td>
+      <td>${t.priority}</td>
+      <td>${t.anonymous ? '<em>Anonymous</em>' : (t.assignee || '-')}</td>
+      <td>${t.owner_id}</td>
+      <td>${days(t.created_at)}d</td>
+      <td>
+        <button class="btn ghost" style="height:32px; font-size:12px; padding:0 10px;" onclick="openDetail('${t.ticket_id}')">Open</button>
+      </td>
+    </tr>
+  `).join("");
 }
 
 /* ---------- Actions ---------- */
@@ -193,11 +269,11 @@ function finalizeCreate(fd, attachments){
   tickets.unshift(t);
   saveTickets(tickets);
   closeModal(createModal);
-  renderMyTickets();
+  renderApp();
 }
 
 // Open Detail
-function openDetail(id){
+window.openDetail = function(id){ // Make global for onclick
   tickets = loadTickets();
   const t = tickets.find(x => x.ticket_id === id);
   if (!t) return alert('Ticket not found');
@@ -235,6 +311,21 @@ function openDetail(id){
   });
   
   detailBlocked.textContent = t.blocked_reason || '-';
+
+  // Admin Controls Logic
+  if (CURRENT_USER === "admin") {
+    adminControls.style.display = "grid";
+    adminStatusSelect.value = t.status;
+    adminAssigneeInput.value = t.assignee === 'Unassigned' ? '' : t.assignee;
+    adminBlockedInput.value = t.blocked_reason || '';
+    btnDeleteTicket.style.display = "block"; // Admin can delete
+  } else {
+    adminControls.style.display = "none";
+    // Only show delete if it's the owner? Or allow owner to delete too?
+    // For now, let's keep delete button visible for owner as per previous request
+    btnDeleteTicket.style.display = "block"; 
+  }
+
   openModal(detailModal);
 }
 
@@ -248,14 +339,31 @@ commentForm.addEventListener('submit', e => {
   const t = tickets.find(x => x.ticket_id === selectedTicketId);
   if (!t) return;
   
-  const author = t.anonymous ? 'Anonymous' : CURRENT_USER;
+  const author = t.anonymous && CURRENT_USER !== 'admin' ? 'Anonymous' : CURRENT_USER;
   t.comments.push({ author, text, created_at: now() });
   t.updated_at = now();
   saveTickets(tickets);
   
   commentInput.value = '';
   openDetail(selectedTicketId); // Refresh detail view
-  renderMyTickets(); // Refresh list (if needed)
+  renderApp(); // Refresh list
+});
+
+// Admin Save Changes
+btnAdminSave.addEventListener("click", () => {
+  if (!selectedTicketId) return;
+  tickets = loadTickets();
+  const t = tickets.find(x => x.ticket_id === selectedTicketId);
+  if (!t) return;
+
+  t.status = adminStatusSelect.value;
+  t.assignee = adminAssigneeInput.value.trim() || 'Unassigned';
+  t.blocked_reason = adminBlockedInput.value.trim() || null;
+  t.updated_at = now();
+  
+  saveTickets(tickets);
+  openDetail(selectedTicketId); // Refresh modal
+  renderApp(); // Refresh table
 });
 
 // Delete Ticket
@@ -266,12 +374,29 @@ btnDeleteTicket.addEventListener("click", () => {
     tickets = tickets.filter(t => t.ticket_id !== selectedTicketId);
     saveTickets(tickets);
     closeModal(detailModal);
-    renderMyTickets();
+    renderApp();
   }
 });
 
 /* ---------- Events ---------- */
+userSelect.addEventListener("change", () => {
+  CURRENT_USER = userSelect.value;
+  if(CURRENT_USER === "admin"){
+    userAvatar.textContent = "AD";
+    userAvatar.style.color = "#b91c1c";
+    userAvatar.style.background = "#fde2e2";
+  } else {
+    userAvatar.textContent = "DK";
+    userAvatar.style.color = "";
+    userAvatar.style.background = "";
+  }
+  renderApp();
+});
+
 searchInput.addEventListener('input', renderMyTickets);
+adminSearchInput.addEventListener('input', renderAdminTable);
+adminFilterSelect.addEventListener('change', renderAdminTable);
+btnRefresh.addEventListener('click', renderAdminTable);
 
 // Initial Render
-renderMyTickets();
+renderApp();
