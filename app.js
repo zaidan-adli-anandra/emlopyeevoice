@@ -13,15 +13,32 @@ const $$ = s => document.querySelectorAll(s);
 function uid(){ return 'TKT-' + Math.floor(Math.random()*90000+10000); }
 function now(){ return new Date().toISOString(); }
 function fmtDate(iso){ return new Date(iso).toLocaleString(); }
+function getOwnerName(id){ 
+  if(id==='member:leo') return 'Dzikra Ksatria'; 
+  if(id==='admin') return 'Admin'; 
+  return id; 
+}
 
 function loadTickets(){ try { return JSON.parse(localStorage.getItem(KEY) || '[]'); } catch(e){ return []; } }
 function saveTickets(data){ localStorage.setItem(KEY, JSON.stringify(data)); broadcast(); }
 function broadcast(){ if (bc) bc.postMessage({type:'sync'}); else localStorage.setItem('ev_dual_sync_ts', Date.now()); }
 
 /* ---------- Elements ---------- */
-const userSelect = $("#userSelect");
+// Login Elements
+const loginPage = $("#loginPage");
+const loginForm = $("#loginForm");
+const usernameInput = $("#username");
+const passwordInput = $("#password");
+const loginError = $("#loginError");
+const app = $("#app");
+const btnLogout = $("#btnLogout");
+
+// Sidebar User Elements
 const userAvatar = $("#userAvatar");
-let CURRENT_USER = "Dzikra Ksatria"; // default user
+const userName = $("#userName");
+const userRole = $("#userRole");
+
+let CURRENT_USER = null; // Set after login
 
 // User Views
 const userToolbar = $("#userToolbar");
@@ -61,6 +78,10 @@ const adminStatusSelect = $("#adminStatusSelect");
 const adminAssigneeInput = $("#adminAssigneeInput");
 const adminBlockedInput = $("#adminBlockedInput");
 const btnAdminSave = $("#btnAdminSave");
+
+// Image Preview Elements
+const imageModal = $("#imageModal");
+const previewImage = $("#previewImage");
 
 let tickets = loadTickets();
 let selectedTicketId = null;
@@ -169,8 +190,7 @@ function renderAdminTable() {
       <td>${t.category}</td>
       <td>${statusBadge(t.status)}</td>
       <td>${t.priority}</td>
-      <td>${t.anonymous ? '<em>Anonymous</em>' : (t.assignee || '-')}</td>
-      <td>${t.owner_id}</td>
+      <td>${t.anonymous ? '<em>Anonymous</em>' : getOwnerName(t.owner_id)}</td>
       <td>${days(t.created_at)}d</td>
       <td>
         <button class="btn ghost" style="height:32px; font-size:12px; padding:0 10px;" onclick="openDetail('${t.ticket_id}')">Open</button>
@@ -290,6 +310,11 @@ window.openDetail = function(id){ // Make global for onclick
       const img = document.createElement('img'); 
       img.src = a.data; 
       img.className='attachment-thumb'; 
+      img.style.cursor = 'pointer';
+      img.onclick = () => {
+        previewImage.src = a.data;
+        openModal(imageModal);
+      };
       detailAttachments.appendChild(img);
     } else {
       const ael = document.createElement('a'); 
@@ -379,18 +404,51 @@ btnDeleteTicket.addEventListener("click", () => {
 });
 
 /* ---------- Events ---------- */
-userSelect.addEventListener("change", () => {
-  CURRENT_USER = userSelect.value;
-  if(CURRENT_USER === "admin"){
+// Login Logic
+loginForm.addEventListener("submit", (e) => {
+  e.preventDefault();
+  const u = usernameInput.value.trim().toLowerCase();
+  const p = passwordInput.value.trim();
+  
+  if (u === "dzikra" && p === "123") {
+    loginSuccess("Dzikra", "Dzikra Ksatria", "Member");
+  } else if (u === "admin" && p === "123") {
+    loginSuccess("admin", "Admin", "Administrator");
+  } else {
+    loginError.style.display = "block";
+  }
+});
+
+function loginSuccess(id, name, role) {
+  CURRENT_USER = id;
+  
+  // Update Sidebar
+  userName.textContent = name;
+  userRole.textContent = role;
+  
+  if (id === "admin") {
     userAvatar.textContent = "AD";
     userAvatar.style.color = "#b91c1c";
     userAvatar.style.background = "#fde2e2";
   } else {
     userAvatar.textContent = "DK";
-    userAvatar.style.color = "";
-    userAvatar.style.background = "";
+    userAvatar.style.color = "#1d4ed8";
+    userAvatar.style.background = "#e0ecff";
   }
+
+  // Switch View
+  loginPage.style.display = "none";
+  app.style.display = "grid";
+  loginError.style.display = "none";
+  loginForm.reset();
+  
   renderApp();
+}
+
+btnLogout.addEventListener("click", () => {
+  CURRENT_USER = null;
+  app.style.display = "none";
+  loginPage.style.display = "flex";
 });
 
 searchInput.addEventListener('input', renderMyTickets);
@@ -398,5 +456,5 @@ adminSearchInput.addEventListener('input', renderAdminTable);
 adminFilterSelect.addEventListener('change', renderAdminTable);
 btnRefresh.addEventListener('click', renderAdminTable);
 
-// Initial Render
-renderApp();
+// Initial Render (Wait for login)
+// renderApp(); // Removed, called after login

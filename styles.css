@@ -219,6 +219,24 @@ tbody tr:hover td{ background:#fbfbff }
   font-size: 14px;
 }
 
+/* Login Page */
+.login-page {
+  position: fixed; inset: 0; z-index: 9999;
+  background: var(--bg);
+  display: flex; align-items: center; justify-content: center;
+}
+.login-card {
+  background: #fff; padding: 40px; border-radius: 16px;
+  box-shadow: var(--shadow); width: 100%; max-width: 400px;
+  display: flex; flex-direction: column; gap: 20px;
+}
+.login-header { text-align: center; margin-bottom: 10px; }
+.login-logo { height: 60px; margin-bottom: 16px; }
+.login-title { font-size: 24px; font-weight: 800; color: var(--text); }
+.login-sub { color: var(--muted); font-size: 14px; }
+.login-form { display: flex; flex-direction: column; gap: 16px; }
+.error-msg { color: #ef4444; font-size: 13px; text-align: center; display: none; }
+
 @media (max-width: 900px){
   .app{ grid-template-columns: 220px 1fr; }
   .dialog-body{ grid-template-columns:1fr }

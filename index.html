@@ -7,17 +7,44 @@
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <div class="app">
+  <!-- Login Page -->
+  <div id="loginPage" class="login-page">
+    <div class="login-card">
+      <div class="login-header">
+        <img src="logoEV.png" alt="Logo" class="login-logo">
+        <div class="login-title">Welcome Back</div>
+        <div class="login-sub">Please sign in to continue</div>
+      </div>
+      <form id="loginForm" class="login-form">
+        <label class="field">
+          <span>Username</span>
+          <input type="text" id="username" placeholder="e.g. dzikra or admin" required>
+        </label>
+        <label class="field">
+          <span>Password</span>
+          <input type="password" id="password" placeholder="Enter password" required>
+        </label>
+        <div id="loginError" class="error-msg">Invalid username or password</div>
+        <button type="submit" class="btn primary" style="width:100%">Sign In</button>
+      </form>
+      <div style="text-align:center; font-size:12px; color:var(--muted); margin-top:10px;">
+        Demo: <strong>dzikra</strong> / 123 &nbsp;|&nbsp; <strong>admin</strong> / 123
+      </div>
+    </div>
+  </div>
+
+  <div id="app" class="app" style="display:none;">
     <!-- Sidebar -->
     <aside class="sidebar">
       <div class="user">
         <div class="avatar" id="userAvatar">DK</div>
         <div class="user-meta">
-          <select id="userSelect" style="border:0; background:transparent; font-weight:700; font-size:14px; color:var(--text); cursor:pointer; outline:none; padding:0; font-family:inherit;">
-            <option value="member:leo">Dzikra Ksatria</option>
-            <option value="admin">Admin</option>
-          </select>
+          <div id="userName" class="user-name">Dzikra Ksatria</div>
+          <div id="userRole" style="font-size:12px; color:var(--muted)">Member</div>
         </div>
+        <button id="btnLogout" class="icon-btn" style="width:32px; height:32px; margin-left:auto; border:0;" title="Logout">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+        </button>
       </div>
       <nav class="sidenav">
         <button class="nav-item active">
@@ -88,8 +115,7 @@
                   <th>Category</th>
                   <th>Status</th>
                   <th>Priority</th>
-                  <th>Assignee</th>
-                  <th>Owner</th>
+                  <th>User</th>
                   <th>Age</th>
                   <th>Action</th>
                 </tr>
@@ -208,6 +234,14 @@
         <button class="btn ghost" id="btnDeleteTicket" style="color: #dc2626; border-color: #fecaca; background: #fef2f2;">Delete</button>
         <button class="btn ghost close-modal" data-target="detailModal">Close</button>
       </footer>
+    </div>
+  </div>
+
+  <!-- Image Preview Modal -->
+  <div class="modal" id="imageModal" style="background: rgba(0,0,0,0.9);">
+    <div style="position: relative;">
+      <button class="icon-btn close-modal" data-target="imageModal" style="position: absolute; top: -50px; right: 0; background: rgba(255,255,255,0.2); color: white; border: none;">✕</button>
+      <img id="previewImage" src="" style="max-width: 90vw; max-height: 85vh; border-radius: 4px; display: block;">
     </div>
   </div>
 
